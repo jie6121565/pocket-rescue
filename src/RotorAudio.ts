@@ -1,7 +1,14 @@
+const SIREN_INTERVAL_SECONDS = 8;
+const SIREN_DURATION_SECONDS = 1.32;
+
 export class RotorAudio {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
   private readonly sources: AudioScheduledSourceNode[] = [];
+  private readonly sirens = new Set<OscillatorNode>();
+  private sirenTimer: number | null = null;
+  private nextSirenAt = 0;
+  private sirenTurn = 0;
   private enabled = false;
   private focused = false;
 
@@ -74,12 +81,76 @@ export class RotorAudio {
     this.master.gain.setTargetAtTime(target, now, 0.08);
   }
 
+  private startSirenSchedule() {
+    if (!this.context || this.sirenTimer !== null) return;
+    this.nextSirenAt = this.context.currentTime + 0.35;
+    this.playScheduledSiren();
+    this.sirenTimer = window.setInterval(() => this.playScheduledSiren(), 200);
+  }
+
+  private playScheduledSiren() {
+    if (!this.context || !this.enabled) return;
+    const now = this.context.currentTime;
+    if (this.nextSirenAt > now + 0.04) return;
+    const startAt = this.nextSirenAt < now - 1
+      ? now + 0.03
+      : Math.max(this.nextSirenAt, now + 0.02);
+    this.playSiren(this.sirenTurn % 2 === 0, startAt);
+    this.sirenTurn += 1;
+    this.nextSirenAt = startAt + SIREN_INTERVAL_SECONDS;
+  }
+
+  private playSiren(helicopter: boolean, startAt: number) {
+    if (!this.context || !this.master) return;
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+    const low = helicopter ? 740 : 440;
+    const high = helicopter ? 988 : 660;
+    oscillator.type = helicopter ? 'sine' : 'triangle';
+    oscillator.frequency.value = low;
+    oscillator.frequency.setValueAtTime(low, startAt);
+    if (helicopter) {
+      for (let note = 0; note < 4; note += 1) {
+        oscillator.frequency.setValueAtTime(note % 2 === 0 ? high : low, startAt + 0.16 + note * 0.28);
+      }
+    } else {
+      oscillator.frequency.linearRampToValueAtTime(high, startAt + 0.38);
+      oscillator.frequency.linearRampToValueAtTime(low, startAt + 0.76);
+      oscillator.frequency.linearRampToValueAtTime(high, startAt + 1.14);
+    }
+    envelope.gain.setValueAtTime(0, startAt);
+    envelope.gain.linearRampToValueAtTime(0.72, startAt + 0.035);
+    envelope.gain.setValueAtTime(0.72, startAt + 1.06);
+    envelope.gain.linearRampToValueAtTime(0, startAt + SIREN_DURATION_SECONDS);
+    oscillator.connect(envelope);
+    envelope.connect(this.master);
+    this.sirens.add(oscillator);
+    oscillator.onended = () => {
+      this.sirens.delete(oscillator);
+      oscillator.disconnect();
+      envelope.disconnect();
+    };
+    oscillator.start(startAt);
+    oscillator.stop(startAt + SIREN_DURATION_SECONDS + 0.02);
+  }
+
+  private stopSirens() {
+    if (this.sirenTimer !== null) {
+      window.clearInterval(this.sirenTimer);
+      this.sirenTimer = null;
+    }
+    for (const siren of this.sirens) siren.stop();
+    this.sirens.clear();
+  }
+
   async setEnabled(enabled: boolean) {
     this.initialize();
     if (!this.context) throw new Error('Audio initialization failed');
     if (this.context.state === 'suspended') await this.context.resume();
     this.enabled = enabled;
     this.updateVolume();
+    if (enabled) this.startSirenSchedule();
+    else this.stopSirens();
   }
 
   setFocused(focused: boolean) {
@@ -88,6 +159,8 @@ export class RotorAudio {
   }
 
   async dispose() {
+    this.enabled = false;
+    this.stopSirens();
     for (const source of this.sources) source.stop();
     this.sources.length = 0;
     if (this.context) await this.context.close();

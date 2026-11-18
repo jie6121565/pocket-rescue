@@ -125,7 +125,7 @@ function updatePauseUI() {
 
 function updateSoundUI() {
   soundButton.setAttribute('aria-pressed', String(soundEnabled));
-  soundButton.setAttribute('aria-label', soundEnabled ? '关闭直升机音效' : '开启直升机音效');
+  soundButton.setAttribute('aria-label', soundEnabled ? '关闭救援音效' : '开启救援音效');
   soundButton.innerHTML = `<i data-lucide="${soundEnabled ? 'volume-2' : 'volume-x'}" aria-hidden="true"></i><span>${soundEnabled ? '关闭音效' : '开启音效'}</span>`;
   refreshIcons();
 }
@@ -193,7 +193,7 @@ soundButton.addEventListener('click', async () => {
     updateSoundUI();
   } catch (error: unknown) {
     console.error('Unable to control helicopter audio', error);
-    soundButton.setAttribute('aria-label', '当前浏览器无法播放直升机音效');
+    soundButton.setAttribute('aria-label', '当前浏览器无法播放救援音效');
     soundButton.innerHTML = '<i data-lucide="volume-x" aria-hidden="true"></i><span>音效不可用</span>';
     refreshIcons();
   } finally {
