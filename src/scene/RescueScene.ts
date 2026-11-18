@@ -5,11 +5,13 @@ import type { TerrainWorld } from './terrain';
 import { createFleetWorld } from './helicopters';
 import type { FleetWorld, HelicopterUnit } from './helicopters';
 import type { HelicopterInfo } from './types';
+import { SCENE_SPEECH } from './types';
 
 interface RescueSceneOptions {
   onReady: () => void;
   onSelect: (info: HelicopterInfo | null) => void;
   onFollowChange: (following: boolean) => void;
+  onSpeak: (text: string) => void;
   onContextLost: () => void;
 }
 
@@ -58,7 +60,7 @@ export class RescueScene {
     const canvas = this.renderer.domElement;
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', '卡通救援小镇三维视图。单指拖动环绕，双指缩放与旋转，轻点直升机聚焦任务。');
+    canvas.setAttribute('aria-label', '卡通救援小镇三维视图。单指拖动环绕，双指缩放与旋转，轻点设施、车辆或直升机听英语介绍。');
     canvas.addEventListener('webglcontextlost', this.handleContextLost);
     container.appendChild(canvas);
 
@@ -185,7 +187,12 @@ export class RescueScene {
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObjects([this.fleet.group, this.terrain.group], true);
     const id: unknown = hits[0]?.object.userData.helicopterId;
-    if (typeof id === 'string') this.focusHelicopter(id);
+    const speechId: unknown = hits[0]?.object.userData.speechId;
+    if (typeof id === 'string') {
+      this.focusHelicopter(id);
+    } else if (typeof speechId === 'string' && SCENE_SPEECH[speechId]) {
+      this.options.onSpeak(SCENE_SPEECH[speechId]);
+    }
   };
 
   private handlePointerCancel = (event: PointerEvent) => {
@@ -247,6 +254,7 @@ export class RescueScene {
     this.controls.minDistance = 2.4;
     this.options.onSelect(unit.info);
     this.options.onFollowChange(follow);
+    this.options.onSpeak(SCENE_SPEECH[unit.info.id]);
   }
 
   setFollowing(following: boolean) {

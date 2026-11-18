@@ -24,6 +24,7 @@ import {
 } from 'lucide';
 import { RescueScene } from './scene/RescueScene';
 import { RotorAudio } from './RotorAudio';
+import { SpeechGuide } from './SpeechGuide';
 import { FLEET, MISSION_META } from './scene/types';
 import type { HelicopterInfo, MissionType } from './scene/types';
 
@@ -97,6 +98,7 @@ const soundButton = byId<HTMLButtonElement>('sound-toggle');
 const fleetPanel = byId<HTMLElement>('fleet-panel');
 const fleetOpenButton = byId<HTMLButtonElement>('fleet-open');
 const rotorAudio = new RotorAudio();
+const speechGuide = new SpeechGuide(byId('speech-status'));
 let autoRotate = false;
 let paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let soundEnabled = false;
@@ -149,6 +151,7 @@ try {
     },
     onSelect: updateSelection,
     onFollowChange: () => undefined,
+    onSpeak: (text) => speechGuide.speak(text),
     onContextLost: () => showError('图形上下文已中断，请重新加载以恢复小镇。'),
   });
 } catch (error: unknown) {
@@ -235,6 +238,7 @@ window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     scene.dispose();
+    speechGuide.dispose();
     void rotorAudio.dispose();
   });
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 export const UP = new THREE.Vector3(0, 1, 0);
+export const GROUND_Y = 0.46;
 
 export function standardMaterial(color: string | number, options: Partial<THREE.MeshStandardMaterialParameters> = {}) {
   return new THREE.MeshStandardMaterial({

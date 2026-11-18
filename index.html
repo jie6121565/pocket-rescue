@@ -29,7 +29,7 @@
         <div class="live-row"><span class="live-dot" aria-hidden="true"></span><span id="live-label">小镇运转中</span></div>
         <div class="world-stats">
           <span><i data-lucide="navigation" aria-hidden="true"></i><strong>6</strong> 架直升机</span>
-          <span><i data-lucide="car-front" aria-hidden="true"></i><strong>14</strong> 辆汽车</span>
+          <span><i data-lucide="car-front" aria-hidden="true"></i><strong>16</strong> 辆汽车</span>
         </div>
         <div class="weather"><i data-lucide="wind" aria-hidden="true"></i> 微风 3.2 m/s <span>·</span> 晴 24°C</div>
       </section>
@@ -49,10 +49,10 @@
 
       <div class="scene-hint" id="scene-hint">
         <i data-lucide="mouse-pointer-2" aria-hidden="true"></i>
-        <span>拖动环绕</span><b>·</b><span>滚轮缩放</span><b>·</b><span>点击直升机</span>
+        <span>拖动环绕</span><b>·</b><span>滚轮缩放</span><b>·</b><span>点击听英语</span>
       </div>
       <div class="touch-hint" aria-label="触摸操作提示">
-        <span>单指环绕</span><b>·</b><span>双指缩放/旋转</span><b>·</b><span>轻点直升机</span>
+        <span>单指环绕</span><b>·</b><span>双指缩放/旋转</span><b>·</b><span>轻点听英语</span>
       </div>
 
       <nav class="control-bar hud-panel" aria-label="小镇观察工具">
@@ -68,8 +68,9 @@
       <button class="fleet-open hud-panel" id="fleet-open" aria-expanded="false" aria-controls="fleet-panel"><i data-lucide="radio" aria-hidden="true"></i>任务机队 <span>6</span></button>
 
       <section class="sr-only" aria-label="小镇场景文字说明">
-        这是一座有平地绿地、雪山、森林、湖泊和城市的三维卡通救援小镇。十四辆汽车沿平面道路行驶，六架直升机执行绳梯救援、网兜抓捕、森林消防、警务和运输任务。可使用鼠标或触摸拖动环绕，滚轮或双指缩放，也可以通过机队按钮选择并聚焦各类直升机。开启音效后，可以听到模拟旋翼与发动机声。
+        这是一座有平地绿地、雪山、森林、湖泊和城市的三维卡通救援小镇。十四辆普通汽车和一辆巡逻警车沿平面道路行驶，消防车向森林火场喷水，六架直升机执行救援、消防、警务和运输任务。可使用鼠标或触摸拖动环绕，滚轮或双指缩放，也可以通过机队按钮选择并聚焦各类直升机。点击警察局、消防站、警车、消防车或直升机，会用英语介绍它们。开启音效后，可以听到模拟旋翼与发动机声。
       </section>
+      <div id="speech-status" class="sr-only" role="status" aria-live="polite"></div>
 
       <div class="loading-screen" id="loading-screen" role="status">
         <div class="loading-island" aria-hidden="true"><span></span></div>

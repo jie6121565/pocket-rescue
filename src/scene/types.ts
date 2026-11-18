@@ -51,6 +51,19 @@ export const MISSION_META: Record<MissionType, MissionMeta> = {
   },
 };
 
+export const SCENE_SPEECH: Record<string, string> = {
+  'police-station': 'Police station. The town\'s police headquarters.',
+  'fire-station': 'Fire station. Home of the town\'s fire and rescue team.',
+  'police-car': 'Police car. Patrolling the town.',
+  'fire-engine': 'Fire engine. Spraying water on the forest fire.',
+  'rescue-01': 'Rescue helicopter. A police officer is climbing the rescue ladder.',
+  'rescue-02': 'Rescue helicopter. Capturing a suspect with a net.',
+  'fire-01': 'Fire helicopter. Dropping water on the forest fire.',
+  'fire-02': 'Fire helicopter. Flying between the lake and the fire to refill its water bucket.',
+  'police-02': 'Police helicopter. Patrolling the city with a searchlight.',
+  'transport-01': 'Transport helicopter. Carrying supplies to the mountains.',
+};
+
 export const FLEET: HelicopterInfo[] = [
   { id: 'rescue-01', type: 'rescue', name: '红十字 01', callsign: 'RESCUE 01', mission: '在雪顶山脉放下救援绳梯，接应攀爬中的警务人员。', equipment: '救援绳梯 · 医疗舱 · 山地救援装备', status: '绳梯救援', speed: 0, altitude: 165 },
   { id: 'rescue-02', type: 'rescue', name: '红十字 02', callsign: 'RESCUE 02', mission: '使用抓捕网控制逃跑嫌犯，等待警务人员接应。', equipment: '抓捕网兜 · 吊索 · 搜索摄像', status: '抓捕嫌犯', speed: 0, altitude: 145 },

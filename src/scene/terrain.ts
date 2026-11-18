@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
+  GROUND_Y,
   UP,
   box,
   cylinderBetween,
@@ -9,6 +10,7 @@ import {
   seededRandom,
   standardMaterial,
 } from './primitives';
+import { createEmergencyWorld } from './emergency';
 
 interface AnimatedCar {
   root: THREE.Group;
@@ -34,8 +36,6 @@ export interface TerrainWorld {
   group: THREE.Group;
   update: (elapsed: number) => void;
 }
-
-export const GROUND_Y = 0.46;
 
 const roadMaterial = standardMaterial('#354c51', { roughness: 0.96 });
 const roadLineMaterial = standardMaterial('#f8e6ae', { emissive: '#5a4a20', emissiveIntensity: 0.08 });
@@ -500,6 +500,8 @@ export function createTerrainWorld(): TerrainWorld {
     cars.push({ root, curve: index < 9 ? cityRoad : forestRoad, offset: (index % 9) / 9, speed: 0.018 + random() * 0.01 });
     group.add(root);
   }
+  const emergency = createEmergencyWorld(cityRoad);
+  group.add(emergency.group);
 
   const clouds: AnimatedCloud[] = [];
   for (let index = 0; index < 14; index += 1) {
@@ -536,6 +538,7 @@ export function createTerrainWorld(): TerrainWorld {
       const tangent = car.curve.getTangentAt(t);
       car.root.rotation.y = Math.atan2(tangent.x, tangent.z);
     }
+    emergency.update(elapsed);
     for (const cloud of clouds) {
       cloud.root.position.set(((cloud.x + elapsed * cloud.speed + 11) % 22) - 11, cloud.y, cloud.z);
     }
