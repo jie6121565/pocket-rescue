@@ -195,11 +195,8 @@ function createFireEngine() {
   return { root: markSpeakable(root, 'fire-engine'), flashers: [redLight, blueLight] };
 }
 
-function createWaterJet(engine: THREE.Group) {
-  engine.updateMatrixWorld(true);
-  const origin = engine.localToWorld(new THREE.Vector3(0, 0.62, 0.48));
-  const target = new THREE.Vector3(4.6, GROUND_Y + 0.17, 2.1);
-  const control = origin.clone().lerp(target, 0.5).add(new THREE.Vector3(0, 0.52, 0));
+function createWaterJet(origin: THREE.Vector3, target: THREE.Vector3, lift: number, reverse = false) {
+  const control = origin.clone().lerp(target, 0.5).add(new THREE.Vector3(0, lift, 0));
   const curve = new THREE.QuadraticBezierCurve3(origin, control, target);
   const group = new THREE.Group();
   const material = standardMaterial('#8be4ef', {
@@ -226,19 +223,33 @@ function createWaterJet(engine: THREE.Group) {
   return {
     group,
     update: (elapsed: number) => {
+      if (!group.visible) return;
       drops.forEach((drop, index) => {
-        drop.position.copy(curve.getPoint((elapsed * 1.2 + index / drops.length) % 1));
+        const progress = (elapsed * 1.2 + index / drops.length) % 1;
+        drop.position.copy(curve.getPoint(reverse ? 1 - progress : progress));
       });
     },
   };
 }
 
-export function createEmergencyWorld(road: THREE.CatmullRomCurve3): EmergencyWorld {
+export function createEmergencyWorld(road: THREE.CatmullRomCurve3, serviceRoad: THREE.CatmullRomCurve3): EmergencyWorld {
   const group = new THREE.Group();
   const policeCar = createPoliceCar();
   const fireEngine = createFireEngine();
-  const water = createWaterJet(fireEngine.root);
-  group.add(createPoliceStation(), createFireStation(), policeCar.root, fireEngine.root, water.group);
+  const fireYaw = fireEngine.root.rotation.y;
+  fireEngine.root.updateMatrixWorld(true);
+  const fireOrigin = fireEngine.root.localToWorld(new THREE.Vector3(0, 0.62, 0.48));
+  const fireTarget = new THREE.Vector3(4.6, GROUND_Y + 0.17, 2.1);
+  const fireJet = createWaterJet(fireOrigin, fireTarget, 0.52);
+  fireEngine.root.position.set(2.55, GROUND_Y + 0.05, -1.5);
+  fireEngine.root.rotation.y = Math.atan2(4.05 - 2.55, -2.3 + 1.5);
+  fireEngine.root.updateMatrixWorld(true);
+  const pondOrigin = new THREE.Vector3(3.3, GROUND_Y + 0.09, -1.95);
+  const tank = fireEngine.root.localToWorld(new THREE.Vector3(0, 0.44, -0.16));
+  const pondJet = createWaterJet(pondOrigin, tank, 0.25, true);
+  fireEngine.root.position.set(3.85, GROUND_Y + 0.05, 1.2);
+  fireEngine.root.rotation.y = fireYaw;
+  group.add(createPoliceStation(), createFireStation(), policeCar.root, fireEngine.root, fireJet.group, pondJet.group);
   return {
     group,
     update: (elapsed: number) => {
@@ -247,12 +258,37 @@ export function createEmergencyWorld(road: THREE.CatmullRomCurve3): EmergencyWor
       policeCar.root.position.y += 0.035;
       const tangent = road.getTangentAt(t);
       policeCar.root.rotation.y = Math.atan2(tangent.x, tangent.z);
+      const progress = (elapsed % 32) / 32;
+      if (progress < 0.2 || progress >= 0.7) {
+        fireEngine.root.position.copy(serviceRoad.getPointAt(1));
+        fireEngine.root.position.y += 0.014;
+        fireEngine.root.rotation.y = fireYaw;
+      } else if (progress < 0.36) {
+        const travel = THREE.MathUtils.smoothstep(progress, 0.2, 0.36);
+        fireEngine.root.position.copy(serviceRoad.getPointAt(1 - travel));
+        fireEngine.root.position.y += 0.014;
+        const direction = serviceRoad.getTangentAt(1 - travel).negate();
+        fireEngine.root.rotation.y = Math.atan2(direction.x, direction.z);
+      } else if (progress < 0.54) {
+        fireEngine.root.position.copy(serviceRoad.getPointAt(0));
+        fireEngine.root.position.y += 0.014;
+        fireEngine.root.rotation.y = Math.atan2(4.05 - 2.55, -2.3 + 1.5);
+      } else {
+        const travel = THREE.MathUtils.smoothstep(progress, 0.54, 0.7);
+        fireEngine.root.position.copy(serviceRoad.getPointAt(travel));
+        fireEngine.root.position.y += 0.014;
+        const direction = serviceRoad.getTangentAt(travel);
+        fireEngine.root.rotation.y = Math.atan2(direction.x, direction.z);
+      }
+      fireJet.group.visible = progress < 0.2 || progress >= 0.7;
+      pondJet.group.visible = progress >= 0.36 && progress < 0.54;
       const flash = Math.sin(elapsed * 12) > 0;
       for (const vehicle of [policeCar, fireEngine]) {
         vehicle.flashers[0].visible = flash;
         vehicle.flashers[1].visible = !flash;
       }
-      water.update(elapsed);
+      fireJet.update(elapsed);
+      pondJet.update(elapsed);
     },
   };
 }

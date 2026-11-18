@@ -40,6 +40,11 @@ export interface TerrainWorld {
 const roadMaterial = standardMaterial('#354c51', { roughness: 0.96 });
 const roadLineMaterial = standardMaterial('#f8e6ae', { emissive: '#5a4a20', emissiveIntensity: 0.08 });
 const dark = standardMaterial('#243c42');
+const FIRE_SITES = [
+  { x: 4.6, z: 2.1, scale: 1 },
+  { x: 6.1, z: 3.6, scale: 0.82 },
+  { x: -5.8, z: -1.5, scale: 0.76 },
+];
 
 function roundedRectangle(width: number, depth: number, radius: number) {
   const shape = new THREE.Shape();
@@ -59,7 +64,7 @@ function roundedRectangle(width: number, depth: number, radius: number) {
 
 function createTerrainBase() {
   const group = new THREE.Group();
-  const shape = roundedRectangle(15.8, 12.4, 1.6);
+  const shape = roundedRectangle(19.2, 15, 1.8);
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: 0.64,
     bevelEnabled: true,
@@ -236,7 +241,7 @@ function createBuilding(width: number, height: number, depth: number, color: str
 
 function createTrees(roads: THREE.CatmullRomCurve3[]) {
   const random = seededRandom(7291);
-  const count = 190;
+  const count = 260;
   const trunkGeometry = new THREE.CylinderGeometry(0.045, 0.07, 0.34, 6);
   trunkGeometry.translate(0, 0.17, 0);
   const crownGeometry = new THREE.ConeGeometry(0.28, 0.68, 7);
@@ -251,6 +256,8 @@ function createTrees(roads: THREE.CatmullRomCurve3[]) {
     { x: -5.6, z: -2.8, spreadX: 2.3, spreadZ: 4.4 },
     { x: 1.1, z: -4.3, spreadX: 3, spreadZ: 2 },
     { x: 5.9, z: -0.6, spreadX: 1.6, spreadZ: 2.8 },
+    { x: 7.3, z: -3.8, spreadX: 2.2, spreadZ: 3 },
+    { x: -6.4, z: -1.7, spreadX: 1.6, spreadZ: 1.9 },
   ];
   const roadSamples = roads.flatMap((road) => road.getSpacedPoints(100));
   const matrix = new THREE.Matrix4();
@@ -262,10 +269,10 @@ function createTrees(roads: THREE.CatmullRomCurve3[]) {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       x = zone.x + (random() - 0.5) * zone.spreadX;
       z = zone.z + (random() - 0.5) * zone.spreadZ;
-      const fireDistance = Math.hypot(x - 4.6, z - 2.1);
+      const onFire = FIRE_SITES.some((site) => Math.hypot(x - site.x, z - site.z) < site.scale + 0.14);
       const inLake = ((x - 4.05) / 1.85) ** 2 + ((z + 2.3) / 1.35) ** 2 < 1;
       const onRoad = roadSamples.some((point) => Math.hypot(x - point.x, z - point.z) < 0.63);
-      if (fireDistance > 1.04 && !inLake && !onRoad) break;
+      if (!onFire && !inLake && !onRoad) break;
     }
     const scale = 0.62 + random() * 0.65;
     quaternion.setFromAxisAngle(UP, random() * Math.PI * 2);
@@ -373,7 +380,7 @@ function createLake() {
   return group;
 }
 
-function createFireSite() {
+function createFireSite(x: number, z: number, scale: number) {
   const root = new THREE.Group();
   const flames: THREE.Mesh[] = [];
   const smoke: THREE.Mesh[] = [];
@@ -415,8 +422,32 @@ function createFireSite() {
     root.add(splash);
     splashes.push(splash);
   }
-  root.position.set(4.6, GROUND_Y + 0.02, 2.1);
+  root.position.set(x, GROUND_Y + 0.02, z);
+  root.scale.setScalar(scale);
   return { root, flames, smoke, splashes };
+}
+
+function createOutskirts(random: () => number) {
+  const group = new THREE.Group();
+  const road = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-6.3, GROUND_Y + 0.036, 5.1),
+    new THREE.Vector3(-5.6, GROUND_Y + 0.036, 5.85),
+    new THREE.Vector3(-2.6, GROUND_Y + 0.036, 5.95),
+    new THREE.Vector3(-0.35, GROUND_Y + 0.036, 5.65),
+    new THREE.Vector3(0.65, GROUND_Y + 0.036, 4.7),
+  ], false, 'centripetal');
+  group.add(createRoad(road, 0.44));
+  const colors = ['#efc578', '#e99a7b', '#a4c9bc', '#e7ddbb', '#98b7c5', '#c2d389'];
+  [-5.65, -4.15, -2.65, -1.15, 0.35, 1.85].forEach((x, index) => {
+    const house = createBuilding(0.58 + random() * 0.12, 0.42 + random() * 0.32, 0.48, colors[index], random);
+    house.position.set(x, GROUND_Y + 0.045, 6.65);
+    house.rotation.y = -0.1 + index * 0.025;
+    group.add(house);
+    const garden = makeMesh(new THREE.BoxGeometry(0.85, 0.025, 0.38), standardMaterial('#a8c878'), false, true);
+    garden.position.set(x, GROUND_Y + 0.015, 6.17);
+    group.add(garden);
+  });
+  return { group, road };
 }
 
 function createHelipad() {
@@ -491,24 +522,39 @@ export function createTerrainWorld(): TerrainWorld {
   hospital.position.set(-6.3, GROUND_Y, 0.95);
   hospital.rotation.y = 0.18;
   city.add(hospital);
-  group.add(city, createTrees([cityRoad, forestRoad]), createMountains(), createLake(), createHelipad());
+  const serviceRoad = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(2.55, GROUND_Y + 0.036, -1.5),
+    new THREE.Vector3(2.05, GROUND_Y + 0.036, -0.95),
+    new THREE.Vector3(1.92, GROUND_Y + 0.036, 0.15),
+    new THREE.Vector3(2.5, GROUND_Y + 0.036, 1.22),
+    new THREE.Vector3(3.85, GROUND_Y + 0.036, 1.2),
+  ], false, 'centripetal');
+  group.add(createRoad(serviceRoad, 0.34));
+  const outskirts = createOutskirts(random);
+  group.add(city, outskirts.group, createTrees([cityRoad, forestRoad, outskirts.road, serviceRoad]), createMountains(), createLake(), createHelipad());
 
   const cars: AnimatedCar[] = [];
   const carColors = ['#f06449', '#ffd166', '#f5f2df', '#4c87a8', '#9ed06a', '#e998b3'];
-  for (let index = 0; index < 14; index += 1) {
+  for (let index = 0; index < 20; index += 1) {
     const root = createCar(carColors[index % carColors.length]);
-    cars.push({ root, curve: index < 9 ? cityRoad : forestRoad, offset: (index % 9) / 9, speed: 0.018 + random() * 0.01 });
+    const cityCar = index < 13;
+    cars.push({
+      root,
+      curve: cityCar ? cityRoad : forestRoad,
+      offset: (cityCar ? index : index - 13) / (cityCar ? 13 : 7),
+      speed: 0.018 + random() * 0.01,
+    });
     group.add(root);
   }
-  const emergency = createEmergencyWorld(cityRoad);
+  const emergency = createEmergencyWorld(cityRoad, serviceRoad);
   group.add(emergency.group);
 
   const clouds: AnimatedCloud[] = [];
-  for (let index = 0; index < 14; index += 1) {
+  for (let index = 0; index < 18; index += 1) {
     const cloud = createCloud(0.75 + random() * 0.65, random);
     clouds.push({
       root: cloud,
-      x: -10 + random() * 20,
+      x: -12 + random() * 24,
       y: 8 + random() * 3,
       z: -6 + random() * 11,
       speed: 0.13 + random() * 0.12,
@@ -526,8 +572,8 @@ export function createTerrainWorld(): TerrainWorld {
     group.add(turbine.root);
   }
 
-  const fire = createFireSite();
-  group.add(fire.root);
+  const fires = FIRE_SITES.map((site) => createFireSite(site.x, site.z, site.scale));
+  group.add(...fires.map((fire) => fire.root));
 
   const update = (elapsed: number) => {
     for (const car of cars) {
@@ -540,22 +586,24 @@ export function createTerrainWorld(): TerrainWorld {
     }
     emergency.update(elapsed);
     for (const cloud of clouds) {
-      cloud.root.position.set(((cloud.x + elapsed * cloud.speed + 11) % 22) - 11, cloud.y, cloud.z);
+      cloud.root.position.set(((cloud.x + elapsed * cloud.speed + 12) % 24) - 12, cloud.y, cloud.z);
     }
     for (const turbine of turbines) turbine.rotor.rotation.z = elapsed * turbine.speed;
-    fire.flames.forEach((flame, index) => {
-      flame.scale.y = 0.88 + Math.sin(elapsed * 5 + index * 1.7) * 0.22;
-    });
-    fire.smoke.forEach((puff, index) => {
-      const rise = (elapsed * 0.22 + index * 0.2) % 1.65;
-      const size = 0.72 + rise * 0.38;
-      puff.position.set(Math.sin(elapsed * 0.35 + index) * 0.12 + rise * 0.16, 0.4 + rise, Math.cos(index) * 0.09);
-      puff.scale.set(0.2 * size, 0.17 * size, 0.18 * size);
-    });
-    fire.splashes.forEach((splash, index) => {
-      const spread = 0.65 + ((elapsed * 1.6 + index * 0.17) % 1) * 0.9;
-      splash.scale.set(spread, 1, spread);
-    });
+    for (const fire of fires) {
+      fire.flames.forEach((flame, index) => {
+        flame.scale.y = 0.88 + Math.sin(elapsed * 5 + index * 1.7 + fire.root.position.x) * 0.22;
+      });
+      fire.smoke.forEach((puff, index) => {
+        const rise = (elapsed * 0.22 + index * 0.2) % 1.65;
+        const size = 0.72 + rise * 0.38;
+        puff.position.set(Math.sin(elapsed * 0.35 + index) * 0.12 + rise * 0.16, 0.4 + rise, Math.cos(index) * 0.09);
+        puff.scale.set(0.2 * size, 0.17 * size, 0.18 * size);
+      });
+      fire.splashes.forEach((splash, index) => {
+        const spread = 0.65 + ((elapsed * 1.6 + index * 0.17) % 1) * 0.9;
+        splash.scale.set(spread, 1, spread);
+      });
+    }
   };
 
   update(0);

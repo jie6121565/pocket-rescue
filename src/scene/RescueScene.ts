@@ -129,7 +129,7 @@ export class RescueScene {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
-    const distance = 28.5 * Math.max(1, 1.1 / aspect);
+    const distance = 33.5 * Math.max(1, 1.15 / aspect);
     this.homePosition = new THREE.Vector3(14, 16, 21).normalize().multiplyScalar(distance);
     if (!this.ready || !this.selected) {
       this.camera.position.copy(this.homePosition);
@@ -207,7 +207,7 @@ export class RescueScene {
       this.selected.root.getWorldPosition(position);
       const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.selected.root.quaternion).normalize();
       const side = new THREE.Vector3().crossVectors(THREE.Object3D.DEFAULT_UP, forward).normalize();
-      const isFireMission = this.selected.info.id === 'fire-01';
+      const isFireMission = this.selected.info.id === 'fire-01' || this.selected.info.id === 'rescue-03';
       const focusScale = Math.max(1, 0.9 / this.camera.aspect) * (isFireMission ? 1.35 : 1);
       const targetDrop = isFireMission ? 1.05 : 0.4;
       const target = position.clone().add(new THREE.Vector3(0, -targetDrop * focusScale, 0));

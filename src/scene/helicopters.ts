@@ -8,6 +8,8 @@ import {
 } from './primitives';
 import { FLEET } from './types';
 import type { HelicopterInfo, MissionType } from './types';
+import { createWaterRescueRig } from './water-rescue';
+import type { WaterRescueRig } from './water-rescue';
 
 interface FlightPath {
   centerX: number;
@@ -32,6 +34,7 @@ interface CharacterRig {
 interface RescueGear {
   climber?: CharacterRig;
   capture?: THREE.Group;
+  waterRescue?: WaterRescueRig;
 }
 
 interface HelicopterModel {
@@ -51,6 +54,7 @@ export interface HelicopterUnit {
   waterDrops: THREE.Mesh[];
   climber?: CharacterRig;
   capture?: THREE.Group;
+  waterRescue?: WaterRescueRig;
 }
 
 export interface FleetWorld {
@@ -62,6 +66,7 @@ export interface FleetWorld {
 const PATHS: Record<string, FlightPath> = {
   'rescue-01': { centerX: -3.2, centerZ: -3.65, rangeX: 0, rangeZ: 0, altitude: 4.75, speed: 0, phase: 0, hover: true, yaw: 0.8 },
   'rescue-02': { centerX: 0.9, centerZ: 0.65, rangeX: 0, rangeZ: 0, altitude: 4.6, speed: 0, phase: 1.1, hover: true, yaw: 1.1 },
+  'rescue-03': { centerX: 4.05, centerZ: -2.3, rangeX: 0, rangeZ: 0, altitude: 2.28, speed: 0, phase: 0, yaw: 0.8 },
   'fire-01': { centerX: 4.6, centerZ: 2.1, rangeX: 0, rangeZ: 0, altitude: 3.15, speed: 0, phase: 0, hover: true, yaw: -0.4 },
   'fire-02': { centerX: 3.3, centerZ: -2.35, rangeX: 2.5, rangeZ: 1.45, altitude: 5.4, speed: 0.12, phase: 2.2 },
   'police-02': { centerX: -2.5, centerZ: 1.8, rangeX: 2.7, rangeZ: 2.15, altitude: 5.8, speed: -0.105, phase: 2.8 },
@@ -278,6 +283,7 @@ function addRescueEquipment(model: HelicopterModel, info: HelicopterInfo, metal:
     root.add(capture);
     return { capture };
   }
+  if (info.id === 'rescue-03') return { waterRescue: createWaterRescueRig(root) };
   return {};
 }
 
@@ -515,7 +521,9 @@ export function createFleetWorld(): FleetWorld {
   const update = (elapsed: number, delta: number) => {
     for (const unit of units) {
       const { root, path } = unit;
-      if (path.hover) {
+      if (unit.waterRescue) {
+        unit.waterRescue.update(elapsed, delta, root);
+      } else if (path.hover) {
         root.position.set(
           path.centerX,
           path.altitude + Math.sin(elapsed * 1.25 + path.phase) * 0.045,
