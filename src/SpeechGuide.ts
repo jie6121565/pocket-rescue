@@ -9,7 +9,7 @@ export class SpeechGuide {
     utterance.lang = language;
     utterance.rate = 0.94;
     utterance.pitch = 1;
-    utterance.volume = 1;
+    utterance.volume = language === 'zh-CN' ? 0.7 : 1;
     const locale = language.toLowerCase();
     const prefix = locale.split('-')[0];
     const voices = window.speechSynthesis.getVoices();
