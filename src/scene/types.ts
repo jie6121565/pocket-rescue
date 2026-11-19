@@ -56,13 +56,6 @@ export const SCENE_SPEECH: Record<string, string> = {
   'fire-station': 'Fire station. Home of the town\'s fire and rescue team.',
   'police-car': 'Police car. Patrolling the town.',
   'fire-engine': 'Fire engine. Driving between the pond and the fire to refill and spray water.',
-  'rescue-01': 'Rescue helicopter. A police officer is climbing the rescue ladder.',
-  'rescue-02': 'Rescue helicopter. Capturing a suspect with a net.',
-  'rescue-03': 'Rescue helicopter. Collecting pond water and carrying it to the forest fire.',
-  'fire-01': 'Fire helicopter. Dropping water on the forest fire.',
-  'fire-02': 'Fire helicopter. Flying between the lake and the fire to refill its water bucket.',
-  'police-02': 'Police helicopter. Patrolling the city with a searchlight.',
-  'transport-01': 'Transport helicopter. Carrying supplies to the mountains.',
   'helipad-summit': 'Mountain helipad. A high-altitude landing platform for rescue helicopters.',
   'helipad-hospital-roof': 'Hospital helipad. A compact rooftop landing pad for emergency rescue.',
   'helipad-central': 'City helipad. A small landing pad for rescue operations.',
@@ -73,6 +66,17 @@ export const SCENE_SPEECH: Record<string, string> = {
   'helipad-police-ground': 'Police helipad. A small landing pad for police helicopters.',
   'helipad-logistics': 'Cargo helipad. A large landing pad for transport helicopters.',
 };
+
+export const HELICOPTER_GREETINGS = [
+  '你好,桉弟',
+  '桉弟记得好好吃饭饭',
+  '桉弟,我是直升飞机',
+  '你好,驾驶员桉弟',
+] as const;
+
+export function randomHelicopterGreeting(random = Math.random) {
+  return HELICOPTER_GREETINGS[Math.floor(random() * HELICOPTER_GREETINGS.length)];
+}
 
 export const FLEET: HelicopterInfo[] = [
   { id: 'rescue-01', type: 'rescue', name: '红十字 01', callsign: 'RESCUE 01', mission: '在雪顶山脉放下救援绳梯，接应攀爬中的警务人员。', equipment: '救援绳梯 · 医疗舱 · 山地救援装备', status: '绳梯救援', speed: 0, altitude: 165 },

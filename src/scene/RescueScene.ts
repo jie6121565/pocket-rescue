@@ -7,13 +7,13 @@ import type { FleetWorld, HelicopterUnit } from './helicopters';
 import { createHelipadWorld } from './helipads';
 import type { HelipadWorld } from './helipads';
 import type { HelicopterInfo } from './types';
-import { SCENE_SPEECH } from './types';
+import { SCENE_SPEECH, randomHelicopterGreeting } from './types';
 
 interface RescueSceneOptions {
   onReady: () => void;
   onSelect: (info: HelicopterInfo | null) => void;
   onFollowChange: (following: boolean) => void;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string, language?: 'en-US' | 'zh-CN') => void;
   onContextLost: () => void;
 }
 
@@ -63,7 +63,7 @@ export class RescueScene {
     const canvas = this.renderer.domElement;
     canvas.tabIndex = 0;
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', '卡通救援小镇三维视图。单指拖动环绕，双指缩放与旋转，轻点设施、车辆或直升机听英语介绍。');
+    canvas.setAttribute('aria-label', '卡通救援小镇三维视图。单指拖动环绕，双指缩放与旋转，轻点设施、车辆或停机坪听英语介绍，轻点直升机听中文问候。');
     canvas.addEventListener('webglcontextlost', this.handleContextLost);
     container.appendChild(canvas);
 
@@ -259,7 +259,7 @@ export class RescueScene {
     this.controls.minDistance = 2.4;
     this.options.onSelect(unit.info);
     this.options.onFollowChange(follow);
-    this.options.onSpeak(SCENE_SPEECH[unit.info.id]);
+    this.options.onSpeak(randomHelicopterGreeting(), 'zh-CN');
   }
 
   setFollowing(following: boolean) {

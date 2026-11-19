@@ -151,7 +151,7 @@ try {
     },
     onSelect: updateSelection,
     onFollowChange: () => undefined,
-    onSpeak: (text) => speechGuide.speak(text),
+    onSpeak: (text, language) => speechGuide.speak(text, language),
     onContextLost: () => showError('图形上下文已中断，请重新加载以恢复小镇。'),
   });
 } catch (error: unknown) {
