@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ellipsoid, makeMesh, standardMaterial } from './primitives';
 
 export interface WaterRescueRig {
-  update: (elapsed: number, delta: number, root: THREE.Group) => void;
+  update: (elapsed: number, delta: number, root: THREE.Group, active?: boolean) => void;
 }
 
 export function createWaterRescueRig(root: THREE.Group): WaterRescueRig {
@@ -43,7 +43,17 @@ export function createWaterRescueRig(root: THREE.Group): WaterRescueRig {
   const pond = new THREE.Vector3(4.05, 2.28, -2.3);
   const fire = new THREE.Vector3(6.1, 3.25, 3.6);
   let previousPosition = pond.clone();
-  const update = (elapsed: number, delta: number, helicopter: THREE.Group) => {
+  const update = (elapsed: number, delta: number, helicopter: THREE.Group, active = true) => {
+    if (!active) {
+      rope.visible = false;
+      bucket.visible = false;
+      stream.visible = false;
+      drops.forEach((drop) => { drop.visible = false; });
+      previousPosition.copy(helicopter.position);
+      return;
+    }
+    rope.visible = true;
+    bucket.visible = true;
     const progress = (elapsed % 24) / 24;
     let collecting = false;
     let dropping = false;
@@ -106,6 +116,6 @@ export function createWaterRescueRig(root: THREE.Group): WaterRescueRig {
       }
     });
   };
-  update(0, 0, root);
+  update(0, 0, root, false);
   return { update };
 }

@@ -4,6 +4,8 @@ import { createTerrainWorld } from './terrain';
 import type { TerrainWorld } from './terrain';
 import { createFleetWorld } from './helicopters';
 import type { FleetWorld, HelicopterUnit } from './helicopters';
+import { createHelipadWorld } from './helipads';
+import type { HelipadWorld } from './helipads';
 import type { HelicopterInfo } from './types';
 import { SCENE_SPEECH } from './types';
 
@@ -21,6 +23,7 @@ export class RescueScene {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly controls: OrbitControls;
   private readonly terrain: TerrainWorld;
+  private readonly helipads: HelipadWorld;
   private readonly fleet: FleetWorld;
   private readonly resizeObserver: ResizeObserver;
   private readonly clock = new THREE.Clock();
@@ -109,8 +112,9 @@ export class RescueScene {
     floor.receiveShadow = true;
     this.scene.add(floor);
     this.terrain = createTerrainWorld();
+    this.helipads = createHelipadWorld();
     this.fleet = createFleetWorld();
-    this.scene.add(this.terrain.group, this.fleet.group);
+    this.scene.add(this.terrain.group, this.helipads.group, this.fleet.group);
 
     canvas.addEventListener('pointerdown', this.handlePointerDown);
     canvas.addEventListener('pointermove', this.handlePointerMove);
@@ -185,7 +189,7 @@ export class RescueScene {
       -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hits = this.raycaster.intersectObjects([this.fleet.group, this.terrain.group], true);
+    const hits = this.raycaster.intersectObjects([this.fleet.group, this.helipads.group, this.terrain.group], true);
     const id: unknown = hits[0]?.object.userData.helicopterId;
     const speechId: unknown = hits[0]?.object.userData.speechId;
     if (typeof id === 'string') {
@@ -234,6 +238,7 @@ export class RescueScene {
       this.elapsed += delta;
       this.terrain.update(this.elapsed);
       this.fleet.update(this.elapsed, delta);
+      this.helipads.update(this.elapsed, this.fleet.units);
     }
     this.controls.autoRotate = this.autoRotate && !this.paused && !this.selected && !this.resetting;
     this.updateFocus(delta);
@@ -304,7 +309,10 @@ export class RescueScene {
       if (object instanceof THREE.Mesh || object instanceof THREE.Points) {
         object.geometry.dispose();
         const materials = Array.isArray(object.material) ? object.material : [object.material];
-        materials.forEach((material) => material.dispose());
+        materials.forEach((material) => {
+          if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshBasicMaterial) material.map?.dispose();
+          material.dispose();
+        });
       }
     });
     this.renderer.dispose();

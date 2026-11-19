@@ -11,6 +11,7 @@ import {
   standardMaterial,
 } from './primitives';
 import { createEmergencyWorld } from './emergency';
+import { HELIPADS } from './helipad-data';
 
 interface AnimatedCar {
   root: THREE.Group;
@@ -272,7 +273,8 @@ function createTrees(roads: THREE.CatmullRomCurve3[]) {
       const onFire = FIRE_SITES.some((site) => Math.hypot(x - site.x, z - site.z) < site.scale + 0.14);
       const inLake = ((x - 4.05) / 1.85) ** 2 + ((z + 2.3) / 1.35) ** 2 < 1;
       const onRoad = roadSamples.some((point) => Math.hypot(x - point.x, z - point.z) < 0.63);
-      if (!onFire && !inLake && !onRoad) break;
+      const onHelipad = HELIPADS.some((pad) => pad.kind === 'ground' && Math.hypot(x - pad.x, z - pad.z) < pad.radius + 0.3);
+      if (!onFire && !inLake && !onRoad && !onHelipad) break;
     }
     const scale = 0.62 + random() * 0.65;
     quaternion.setFromAxisAngle(UP, random() * Math.PI * 2);
@@ -450,24 +452,6 @@ function createOutskirts(random: () => number) {
   return { group, road };
 }
 
-function createHelipad() {
-  const root = new THREE.Group();
-  const base = makeMesh(new THREE.CylinderGeometry(0.72, 0.72, 0.055, 32), standardMaterial('#5c8176'), false, true);
-  base.position.y = 0.027;
-  const ring = makeMesh(new THREE.TorusGeometry(0.54, 0.022, 5, 32), standardMaterial('#f1e6b8'), false, true);
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.06;
-  const barA = box(0.075, 0.018, 0.48, roadLineMaterial);
-  const barB = barA.clone();
-  barA.position.set(-0.15, 0.065, 0);
-  barB.position.set(0.15, 0.065, 0);
-  const cross = box(0.3, 0.018, 0.075, roadLineMaterial);
-  cross.position.y = 0.065;
-  root.add(base, ring, barA, barB, cross);
-  root.position.set(0.9, GROUND_Y + 0.014, 0.65);
-  return root;
-}
-
 export function createTerrainWorld(): TerrainWorld {
   const group = new THREE.Group();
   const random = seededRandom(9107);
@@ -501,6 +485,7 @@ export function createTerrainWorld(): TerrainWorld {
   let buildingIndex = 0;
   for (const z of [0.8, 1.9, 3.05, 4.18]) {
     for (const x of [-5.12, -3.74, -2.34, -0.96]) {
+      if (z === 4.18 && x === -3.74) continue;
       const width = 0.38 + random() * 0.24;
       const depth = 0.38 + random() * 0.23;
       const height = 0.48 + random() * 0.95;
@@ -531,7 +516,7 @@ export function createTerrainWorld(): TerrainWorld {
   ], false, 'centripetal');
   group.add(createRoad(serviceRoad, 0.34));
   const outskirts = createOutskirts(random);
-  group.add(city, outskirts.group, createTrees([cityRoad, forestRoad, outskirts.road, serviceRoad]), createMountains(), createLake(), createHelipad());
+  group.add(city, outskirts.group, createTrees([cityRoad, forestRoad, outskirts.road, serviceRoad]), createMountains(), createLake());
 
   const cars: AnimatedCar[] = [];
   const carColors = ['#f06449', '#ffd166', '#f5f2df', '#4c87a8', '#9ed06a', '#e998b3'];

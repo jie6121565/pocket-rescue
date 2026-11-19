@@ -63,6 +63,15 @@ export const SCENE_SPEECH: Record<string, string> = {
   'fire-02': 'Fire helicopter. Flying between the lake and the fire to refill its water bucket.',
   'police-02': 'Police helicopter. Patrolling the city with a searchlight.',
   'transport-01': 'Transport helicopter. Carrying supplies to the mountains.',
+  'helipad-summit': 'Mountain helipad. A high-altitude landing platform for rescue helicopters.',
+  'helipad-hospital-roof': 'Hospital helipad. A compact rooftop landing pad for emergency rescue.',
+  'helipad-central': 'City helipad. A small landing pad for rescue operations.',
+  'helipad-waterside': 'Waterside helipad. A large landing pad for water rescue helicopters.',
+  'helipad-forest': 'Forest fire helipad. A large landing pad for firefighting helicopters.',
+  'helipad-ranger': 'Ranger helipad. A compact forest landing pad.',
+  'helipad-city-roof': 'Rooftop helipad. An elevated landing pad above the city.',
+  'helipad-police-ground': 'Police helipad. A small landing pad for police helicopters.',
+  'helipad-logistics': 'Cargo helipad. A large landing pad for transport helicopters.',
 };
 
 export const FLEET: HelicopterInfo[] = [

@@ -10,18 +10,8 @@ import { FLEET } from './types';
 import type { HelicopterInfo, MissionType } from './types';
 import { createWaterRescueRig } from './water-rescue';
 import type { WaterRescueRig } from './water-rescue';
-
-interface FlightPath {
-  centerX: number;
-  centerZ: number;
-  rangeX: number;
-  rangeZ: number;
-  altitude: number;
-  speed: number;
-  phase: number;
-  hover?: boolean;
-  yaw?: number;
-}
+import { getFlightPose } from './flight-plan';
+import type { FlightPose } from './flight-plan';
 
 interface CharacterRig {
   root: THREE.Group;
@@ -33,8 +23,14 @@ interface CharacterRig {
 
 interface RescueGear {
   climber?: CharacterRig;
+  ladder?: THREE.Group;
   capture?: THREE.Group;
   waterRescue?: WaterRescueRig;
+  waterDrops?: THREE.Mesh[];
+  cargo?: THREE.Group;
+  bucketRig?: THREE.Group;
+  waterStream?: THREE.Mesh;
+  searchBeam?: THREE.Mesh;
 }
 
 interface HelicopterModel {
@@ -44,17 +40,12 @@ interface HelicopterModel {
   secondaryRotor?: THREE.Group;
 }
 
-export interface HelicopterUnit {
+export interface HelicopterUnit extends HelicopterModel, RescueGear {
   info: HelicopterInfo;
-  root: THREE.Group;
-  path: FlightPath;
-  mainRotor: THREE.Group;
-  tailRotor: THREE.Group;
-  secondaryRotor?: THREE.Group;
+  flight: FlightPose;
   waterDrops: THREE.Mesh[];
-  climber?: CharacterRig;
-  capture?: THREE.Group;
-  waterRescue?: WaterRescueRig;
+  rotorDiscs: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[];
+  navigationLights: THREE.Mesh[];
 }
 
 export interface FleetWorld {
@@ -62,16 +53,6 @@ export interface FleetWorld {
   units: HelicopterUnit[];
   update: (elapsed: number, delta: number) => void;
 }
-
-const PATHS: Record<string, FlightPath> = {
-  'rescue-01': { centerX: -3.2, centerZ: -3.65, rangeX: 0, rangeZ: 0, altitude: 4.75, speed: 0, phase: 0, hover: true, yaw: 0.8 },
-  'rescue-02': { centerX: 0.9, centerZ: 0.65, rangeX: 0, rangeZ: 0, altitude: 4.6, speed: 0, phase: 1.1, hover: true, yaw: 1.1 },
-  'rescue-03': { centerX: 4.05, centerZ: -2.3, rangeX: 0, rangeZ: 0, altitude: 2.28, speed: 0, phase: 0, yaw: 0.8 },
-  'fire-01': { centerX: 4.6, centerZ: 2.1, rangeX: 0, rangeZ: 0, altitude: 3.15, speed: 0, phase: 0, hover: true, yaw: -0.4 },
-  'fire-02': { centerX: 3.3, centerZ: -2.35, rangeX: 2.5, rangeZ: 1.45, altitude: 5.4, speed: 0.12, phase: 2.2 },
-  'police-02': { centerX: -2.5, centerZ: 1.8, rangeX: 2.7, rangeZ: 2.15, altitude: 5.8, speed: -0.105, phase: 2.8 },
-  'transport-01': { centerX: -0.3, centerZ: -3.3, rangeX: 2.7, rangeZ: 1.5, altitude: 6.6, speed: 0.085, phase: 1.8 },
-};
 
 function createRotor(accent: THREE.Material, dark: THREE.Material) {
   const rotor = new THREE.Group();
@@ -86,8 +67,16 @@ function createRotor(accent: THREE.Material, dark: THREE.Material) {
     rotor.add(arm);
   }
   const hub = makeMesh(new THREE.CylinderGeometry(0.07, 0.09, 0.09, 8), accent);
-  rotor.add(hub);
-  return rotor;
+  const disc = makeMesh(
+    new THREE.CircleGeometry(1.04, 48),
+    new THREE.MeshBasicMaterial({ color: '#b5d5d1', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+    false,
+    false,
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.015;
+  rotor.add(hub, disc);
+  return { rotor, disc };
 }
 
 function addSkids(root: THREE.Group, dark: THREE.Material, metal: THREE.Material) {
@@ -215,9 +204,10 @@ function addRescueEquipment(model: HelicopterModel, info: HelicopterInfo, metal:
   root.add(winch);
 
   if (info.id === 'rescue-01') {
+    const ladder = new THREE.Group();
     const rope = standardMaterial('#6c5a3d');
     for (const x of [-0.18, 0.18]) {
-      root.add(cylinderBetween(
+      ladder.add(cylinderBetween(
         new THREE.Vector3(x, -0.32, 0),
         new THREE.Vector3(x, -2.45, 0),
         0.018,
@@ -227,7 +217,7 @@ function addRescueEquipment(model: HelicopterModel, info: HelicopterInfo, metal:
     }
     for (let rung = 0; rung < 10; rung += 1) {
       const y = -0.43 - rung * 0.22;
-      root.add(cylinderBetween(
+      ladder.add(cylinderBetween(
         new THREE.Vector3(-0.18, y, 0),
         new THREE.Vector3(0.18, y, 0),
         0.022,
@@ -239,8 +229,9 @@ function addRescueEquipment(model: HelicopterModel, info: HelicopterInfo, metal:
     climber.root.position.set(0, -1.7, 0.09);
     climber.leftArm.rotation.z = -0.25;
     climber.rightArm.rotation.z = 0.25;
-    root.add(climber.root);
-    return { climber };
+    ladder.add(climber.root);
+    root.add(ladder);
+    return { climber, ladder };
   }
 
   if (info.id === 'rescue-02') {
@@ -292,10 +283,11 @@ function addFireEquipment(model: HelicopterModel, info: HelicopterInfo, yellow: 
   const tank = ellipsoid(0.27, 0.17, 0.4, yellow, 1);
   tank.position.set(0, -0.29, -0.02);
   root.add(tank);
+  const bucketRig = new THREE.Group();
   const hose = makeMesh(new THREE.CylinderGeometry(0.035, 0.035, 0.32, 8), metal);
   hose.position.set(0, -0.48, 0.03);
-  root.add(hose);
-  root.add(cylinderBetween(
+  bucketRig.add(hose);
+  bucketRig.add(cylinderBetween(
     new THREE.Vector3(0, -0.36, -0.06),
     new THREE.Vector3(0, -1.12, -0.06),
     0.012,
@@ -304,11 +296,13 @@ function addFireEquipment(model: HelicopterModel, info: HelicopterInfo, yellow: 
   ));
   const bucket = makeMesh(new THREE.CylinderGeometry(0.17, 0.12, 0.25, 10), yellow);
   bucket.position.set(0, -1.25, -0.06);
-  root.add(bucket);
+  bucketRig.add(bucket);
   const handle = makeMesh(new THREE.TorusGeometry(0.14, 0.012, 6, 16, Math.PI), metal);
   handle.position.set(0, -1.1, -0.06);
-  root.add(handle);
+  bucketRig.add(handle);
+  root.add(bucketRig);
   const waterDrops: THREE.Mesh[] = [];
+  let waterStream: THREE.Mesh | undefined;
   if (info.id === 'fire-01') {
     const waterMaterial = standardMaterial('#79dbeb', {
       emissive: '#3baac1',
@@ -319,9 +313,9 @@ function addFireEquipment(model: HelicopterModel, info: HelicopterInfo, yellow: 
     });
     const streamMaterial = waterMaterial.clone();
     streamMaterial.opacity = 0.34;
-    const stream = makeMesh(new THREE.CylinderGeometry(0.045, 0.075, 2.4, 8), streamMaterial, false, false);
-    stream.position.set(0, -2.55, -0.06);
-    root.add(stream);
+    waterStream = makeMesh(new THREE.CylinderGeometry(0.045, 0.075, 2.4, 8), streamMaterial, false, false);
+    waterStream.position.set(0, -2.55, -0.06);
+    root.add(waterStream);
     for (let index = 0; index < 32; index += 1) {
       const drop = ellipsoid(0.032, 0.085, 0.032, waterMaterial, 0);
       drop.position.set((index % 4 - 1.5) * 0.05, -1.4 - index * 0.075, -0.06 + (index % 3 - 1) * 0.04);
@@ -330,7 +324,7 @@ function addFireEquipment(model: HelicopterModel, info: HelicopterInfo, yellow: 
       waterDrops.push(drop);
     }
   }
-  return waterDrops;
+  return { waterDrops, bucketRig, waterStream };
 }
 
 function addPoliceEquipment(root: THREE.Group, info: HelicopterInfo, metal: THREE.Material) {
@@ -344,8 +338,9 @@ function addPoliceEquipment(root: THREE.Group, info: HelicopterInfo, metal: THRE
   const lamp = box(0.15, 0.12, 0.18, metal);
   lamp.position.set(0.19, -0.26, 0.33);
   root.add(lamp);
+  let searchBeam: THREE.Mesh | undefined;
   if (info.id === 'police-02') {
-    const beam = makeMesh(
+    searchBeam = makeMesh(
       new THREE.ConeGeometry(0.58, 2.35, 20, 1, true),
       new THREE.MeshBasicMaterial({
         color: '#d2f4e9',
@@ -357,9 +352,10 @@ function addPoliceEquipment(root: THREE.Group, info: HelicopterInfo, metal: THRE
       false,
       false,
     );
-    beam.position.set(0.19, -1.45, 0.33);
-    root.add(beam);
+    searchBeam.position.set(0.19, -1.45, 0.33);
+    root.add(searchBeam);
   }
+  return searchBeam;
 }
 
 function addTransportEquipment(model: HelicopterModel, info: HelicopterInfo, olive: THREE.Material, metal: THREE.Material, dark: THREE.Material) {
@@ -373,13 +369,15 @@ function addTransportEquipment(model: HelicopterModel, info: HelicopterInfo, oli
   ramp.position.set(0, -0.25, -0.56);
   ramp.rotation.x = -0.35;
   root.add(ramp);
+  let cargo: THREE.Group | undefined;
   if (info.id === 'transport-01') {
+    cargo = new THREE.Group();
     const crate = box(0.52, 0.45, 0.52, standardMaterial('#bd9561'));
     crate.position.set(0, -1.45, 0);
-    root.add(crate);
+    cargo.add(crate);
     for (const x of [-0.22, 0.22]) {
       for (const z of [-0.22, 0.22]) {
-        root.add(cylinderBetween(
+        cargo.add(cylinderBetween(
           new THREE.Vector3(x * 0.65, -0.28, z * 0.65),
           new THREE.Vector3(x, -1.22, z),
           0.012,
@@ -388,13 +386,19 @@ function addTransportEquipment(model: HelicopterModel, info: HelicopterInfo, oli
         ));
         const strap = box(0.045, 0.46, 0.535, dark);
         strap.position.set(x, -1.45, 0);
-        root.add(strap);
+        cargo.add(strap);
       }
     }
+    root.add(cargo);
   }
+  return cargo;
 }
 
-function createHelicopter(info: HelicopterInfo): HelicopterModel & RescueGear & { waterDrops: THREE.Mesh[] } {
+function createHelicopter(info: HelicopterInfo): HelicopterModel & RescueGear & {
+  waterDrops: THREE.Mesh[];
+  rotorDiscs: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[];
+  navigationLights: THREE.Mesh[];
+} {
   const root = new THREE.Group();
   const paintColors: Record<MissionType, string> = {
     rescue: '#f1eee0',
@@ -456,16 +460,20 @@ function createHelicopter(info: HelicopterInfo): HelicopterModel & RescueGear & 
   const mast = makeMesh(new THREE.CylinderGeometry(0.035, 0.045, 0.2, 8), metal);
   mast.position.set(0, 0.4, isTransport ? 0.28 : 0);
   root.add(mast);
-  const mainRotor = createRotor(accent, dark);
+  const mainAssembly = createRotor(accent, dark);
+  const mainRotor = mainAssembly.rotor;
   mainRotor.position.set(0, 0.52, isTransport ? 0.28 : 0);
   root.add(mainRotor);
+  const rotorDiscs = [mainAssembly.disc];
 
   let secondaryRotor: THREE.Group | undefined;
   if (isTransport) {
     const rearMast = makeMesh(new THREE.CylinderGeometry(0.04, 0.05, 0.22, 8), metal);
     rearMast.position.set(0, 0.4, -0.65);
-    secondaryRotor = createRotor(accent, dark);
+    const secondaryAssembly = createRotor(accent, dark);
+    secondaryRotor = secondaryAssembly.rotor;
     secondaryRotor.position.set(0, 0.53, -0.65);
+    rotorDiscs.push(secondaryAssembly.disc);
     root.add(rearMast, secondaryRotor);
   }
 
@@ -488,13 +496,15 @@ function createHelicopter(info: HelicopterInfo): HelicopterModel & RescueGear & 
   navGreen.position.set(0.34, 0.02, -0.08);
   root.add(navRed, navGreen);
 
-  const rescueGear = info.type === 'rescue'
+  const rescueGear: RescueGear = info.type === 'rescue'
     ? addRescueEquipment({ root, mainRotor, tailRotor, secondaryRotor }, info, metal, accent)
     : {};
-  let waterDrops: THREE.Mesh[] = [];
-  if (info.type === 'fire') waterDrops = addFireEquipment({ root, mainRotor, tailRotor, secondaryRotor }, info, accent, metal);
-  if (info.type === 'police') addPoliceEquipment(root, info, metal);
-  if (info.type === 'transport') addTransportEquipment({ root, mainRotor, tailRotor, secondaryRotor }, info, accent, metal, dark);
+  if (info.type === 'fire') {
+    Object.assign(rescueGear, addFireEquipment({ root, mainRotor, tailRotor, secondaryRotor }, info, accent, metal));
+  }
+  if (info.type === 'police') rescueGear.searchBeam = addPoliceEquipment(root, info, metal);
+  if (info.type === 'transport') rescueGear.cargo = addTransportEquipment({ root, mainRotor, tailRotor, secondaryRotor }, info, accent, metal, dark);
+  const waterDrops = rescueGear.waterDrops ?? [];
 
   root.scale.setScalar(isTransport ? 0.78 : 0.69);
   root.traverse((child) => {
@@ -505,7 +515,7 @@ function createHelicopter(info: HelicopterInfo): HelicopterModel & RescueGear & 
     }
   });
   root.userData.helicopterId = info.id;
-  return { root, mainRotor, tailRotor, secondaryRotor, waterDrops, ...rescueGear };
+  return { root, mainRotor, tailRotor, secondaryRotor, waterDrops, rotorDiscs, navigationLights: [navRed, navGreen], ...rescueGear };
 }
 
 export function createFleetWorld(): FleetWorld {
@@ -513,39 +523,36 @@ export function createFleetWorld(): FleetWorld {
   const units: HelicopterUnit[] = [];
   for (const info of FLEET) {
     const model = createHelicopter(info);
-    const unit: HelicopterUnit = { info, path: PATHS[info.id], ...model };
+    const unit: HelicopterUnit = { info, flight: getFlightPose(info.id, 0), ...model };
     units.push(unit);
     group.add(model.root);
   }
 
   const update = (elapsed: number, delta: number) => {
     for (const unit of units) {
-      const { root, path } = unit;
-      if (unit.waterRescue) {
-        unit.waterRescue.update(elapsed, delta, root);
-      } else if (path.hover) {
-        root.position.set(
-          path.centerX,
-          path.altitude + Math.sin(elapsed * 1.25 + path.phase) * 0.045,
-          path.centerZ,
-        );
-        root.rotation.y = path.yaw ?? 0;
-      } else {
-        const angle = path.phase + elapsed * path.speed;
-        const positionAt = (value: number) => new THREE.Vector3(
-          path.centerX + Math.sin(value) * path.rangeX,
-          path.altitude + Math.sin(elapsed * 1.4 + path.phase) * 0.05,
-          path.centerZ + Math.cos(value) * path.rangeZ,
-        );
-        const position = positionAt(angle);
-        const next = positionAt(angle + Math.sign(path.speed) * 0.015);
-        root.position.copy(position);
-        root.rotation.y = Math.atan2(next.x - position.x, next.z - position.z);
+      const { root } = unit;
+      const pose = getFlightPose(unit.info.id, elapsed);
+      unit.flight = pose;
+      const onMission = pose.stage === 'mission';
+      root.position.set(pose.x, pose.y, pose.z);
+      root.rotation.set(pose.pitch, pose.yaw, pose.roll, 'YXZ');
+      unit.mainRotor.rotation.y += delta * pose.rotorSpeed;
+      unit.tailRotor.rotation.x += delta * pose.rotorSpeed * 1.3;
+      if (unit.secondaryRotor) unit.secondaryRotor.rotation.y -= delta * pose.rotorSpeed * 0.94;
+      for (const disc of unit.rotorDiscs) {
+        disc.visible = pose.rotorSpeed > 4;
+        disc.material.opacity = pose.rotorSpeed / 24 * 0.13;
       }
-      unit.mainRotor.rotation.y = elapsed * 24 + unit.path.phase;
-      unit.tailRotor.rotation.x = elapsed * 31;
-      if (unit.secondaryRotor) unit.secondaryRotor.rotation.y = -elapsed * 22;
-      if (unit.climber) {
+      for (const light of unit.navigationLights) light.visible = pose.rotorSpeed > 0 && elapsed % 1 < 0.82;
+      if (unit.ladder) unit.ladder.visible = onMission;
+      if (unit.capture) unit.capture.visible = onMission;
+      if (unit.searchBeam) unit.searchBeam.visible = onMission;
+      if (unit.waterStream) unit.waterStream.visible = onMission;
+      const equipmentClearance = THREE.MathUtils.clamp((pose.y - pose.contactY) / 1.25, 0, 1);
+      if (unit.bucketRig) unit.bucketRig.scale.y = 0.32 + equipmentClearance * 0.68;
+      if (unit.cargo) unit.cargo.scale.y = 0.2 + equipmentClearance * 0.8;
+      if (unit.waterRescue) unit.waterRescue.update(pose.missionTime, delta, root, onMission);
+      if (unit.climber && onMission) {
         const stride = Math.sin(elapsed * 4.2);
         const climb = (Math.sin(elapsed * 0.65) + 1) / 2;
         unit.climber.root.position.y = -2.05 + climb * 1.15;
@@ -554,11 +561,13 @@ export function createFleetWorld(): FleetWorld {
         unit.climber.leftLeg.rotation.x = -stride * 0.65;
         unit.climber.rightLeg.rotation.x = stride * 0.65;
       }
-      if (unit.capture) {
+      if (unit.capture && onMission) {
         unit.capture.rotation.z = Math.sin(elapsed * 1.4) * 0.075;
         unit.capture.rotation.x = Math.cos(elapsed * 1.1) * 0.045;
       }
       unit.waterDrops.forEach((drop, index) => {
+        drop.visible = onMission;
+        if (!onMission) return;
         drop.position.y -= delta * 3.1;
         if (drop.position.y < -3.88) drop.position.y = -1.4 - (index % 4) * 0.06;
       });
