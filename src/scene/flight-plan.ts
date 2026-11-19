@@ -88,6 +88,8 @@ function missionPoint(plan: FlightPlan, missionTime: number): Point {
     const progress = missionTime / plan.missionDuration;
     const pond = { x: 4.05, y: 2.28, z: -2.3, yaw: 0.8 };
     const fire = { x: 6.1, y: 3.25, z: 3.6, yaw: -0.35 };
+    const pad = getHelipad('waterside');
+    const home = { x: pad.x, y: pad.deckY + plan.groundOffset + FLIGHT_TIMING.hoverHeight, z: pad.z, yaw: pad.yaw };
     if (progress < 0.2) return { ...pond, y: pond.y + Math.sin(missionTime * 1.5) * 0.018 };
     if (progress < 0.26) return { ...pond, y: pond.y + smooth((progress - 0.2) / 0.06) * 2.57 };
     if (progress < 0.5) {
@@ -100,13 +102,13 @@ function missionPoint(plan: FlightPlan, missionTime: number): Point {
       };
     }
     if (progress < 0.66) return { ...fire, y: fire.y + Math.sin(missionTime * 1.3) * 0.025 };
-    if (progress < 0.74) return { ...fire, y: fire.y + smooth((progress - 0.66) / 0.08) * 1.6, yaw: Math.atan2(pond.x - fire.x, pond.z - fire.z) };
+    if (progress < 0.74) return { ...fire, y: fire.y + smooth((progress - 0.66) / 0.08) * 1.6, yaw: Math.atan2(home.x - fire.x, home.z - fire.z) };
     const travel = smooth((progress - 0.74) / 0.26);
     return {
-      x: lerp(fire.x, pond.x, travel),
-      y: 4.85 - smooth((progress - 0.92) / 0.08) * 2.57,
-      z: lerp(fire.z, pond.z, travel),
-      yaw: Math.atan2(pond.x - fire.x, pond.z - fire.z),
+      x: lerp(fire.x, home.x, travel),
+      y: 4.85 - smooth((progress - 0.92) / 0.08) * (4.85 - home.y),
+      z: lerp(fire.z, home.z, travel),
+      yaw: Math.atan2(home.x - fire.x, home.z - fire.z),
     };
   }
   if (path.hover) {
@@ -128,7 +130,8 @@ function missionPoint(plan: FlightPlan, missionTime: number): Point {
 
 function transitPoint(from: Point, to: Point, progress: number, cruiseAltitude: number): Point {
   const amount = smooth(progress);
-  const arc = Math.max(0.65, cruiseAltitude - Math.max(from.y, to.y));
+  const sameVerticalCorridor = Math.abs(from.x - to.x) < 0.0001 && Math.abs(from.z - to.z) < 0.0001;
+  const arc = sameVerticalCorridor ? 0 : Math.max(0.65, cruiseAltitude - Math.max(from.y, to.y));
   return {
     x: lerp(from.x, to.x, amount),
     y: lerp(from.y, to.y, amount) + Math.sin(amount * Math.PI) * arc,

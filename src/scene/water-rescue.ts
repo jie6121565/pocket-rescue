@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { ellipsoid, makeMesh, standardMaterial } from './primitives';
 
 export interface WaterRescueRig {
+  bucket: THREE.Group;
+  setCarryingStarfish: (carrying: boolean) => void;
   update: (elapsed: number, delta: number, root: THREE.Group, active?: boolean) => void;
 }
 
@@ -42,11 +44,17 @@ export function createWaterRescueRig(root: THREE.Group): WaterRescueRig {
 
   const pond = new THREE.Vector3(4.05, 2.28, -2.3);
   const fire = new THREE.Vector3(6.1, 3.25, 3.6);
+  const home = new THREE.Vector3(5.2, 2.23703, -4.65);
   let previousPosition = pond.clone();
+  let carryingStarfish = false;
   const update = (elapsed: number, delta: number, helicopter: THREE.Group, active = true) => {
     if (!active) {
-      rope.visible = false;
-      bucket.visible = false;
+      bucket.position.y = -0.22;
+      rope.scale.y = 0.1;
+      rope.position.y = -0.28;
+      rope.visible = carryingStarfish;
+      bucket.visible = carryingStarfish;
+      fill.visible = false;
       stream.visible = false;
       drops.forEach((drop) => { drop.visible = false; });
       previousPosition.copy(helicopter.position);
@@ -84,8 +92,8 @@ export function createWaterRescueRig(root: THREE.Group): WaterRescueRig {
       helicopter.position.y += THREE.MathUtils.smoothstep(progress, 0.66, 0.74) * 1.6;
     } else {
       const travel = THREE.MathUtils.smoothstep(progress, 0.74, 1);
-      helicopter.position.lerpVectors(fire, pond, travel);
-      helicopter.position.y = 4.85 - THREE.MathUtils.smoothstep(progress, 0.92, 1) * 2.57;
+      helicopter.position.lerpVectors(fire, home, travel);
+      helicopter.position.y = 4.85 - THREE.MathUtils.smoothstep(progress, 0.92, 1) * (4.85 - home.y);
       bucketY = THREE.MathUtils.lerp(-0.95, -2.5, THREE.MathUtils.smoothstep(progress, 0.92, 1));
     }
     const direction = helicopter.position.clone().sub(previousPosition);
@@ -117,5 +125,9 @@ export function createWaterRescueRig(root: THREE.Group): WaterRescueRig {
     });
   };
   update(0, 0, root, false);
-  return { update };
+  return {
+    bucket,
+    setCarryingStarfish: (carrying: boolean) => { carryingStarfish = carrying; },
+    update,
+  };
 }

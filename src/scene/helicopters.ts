@@ -75,6 +75,7 @@ function createRotor(accent: THREE.Material, dark: THREE.Material) {
   );
   disc.rotation.x = -Math.PI / 2;
   disc.position.y = 0.015;
+  disc.raycast = () => undefined;
   rotor.add(hub, disc);
   return { rotor, disc };
 }

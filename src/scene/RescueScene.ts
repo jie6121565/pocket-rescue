@@ -6,6 +6,8 @@ import { createFleetWorld } from './helicopters';
 import type { FleetWorld, HelicopterUnit } from './helicopters';
 import { createHelipadWorld } from './helipads';
 import type { HelipadWorld } from './helipads';
+import { createStarfishWorld } from './starfish';
+import type { StarfishWorld } from './starfish';
 import type { HelicopterInfo } from './types';
 import { SCENE_SPEECH, randomHelicopterGreeting } from './types';
 
@@ -25,6 +27,7 @@ export class RescueScene {
   private readonly terrain: TerrainWorld;
   private readonly helipads: HelipadWorld;
   private readonly fleet: FleetWorld;
+  private readonly starfish: StarfishWorld;
   private readonly resizeObserver: ResizeObserver;
   private readonly clock = new THREE.Clock();
   private readonly raycaster = new THREE.Raycaster();
@@ -114,7 +117,8 @@ export class RescueScene {
     this.terrain = createTerrainWorld();
     this.helipads = createHelipadWorld();
     this.fleet = createFleetWorld();
-    this.scene.add(this.terrain.group, this.helipads.group, this.fleet.group);
+    this.starfish = createStarfishWorld((text, language) => this.options.onSpeak(text, language));
+    this.scene.add(this.terrain.group, this.helipads.group, this.fleet.group, this.starfish.group);
 
     canvas.addEventListener('pointerdown', this.handlePointerDown);
     canvas.addEventListener('pointermove', this.handlePointerMove);
@@ -189,13 +193,13 @@ export class RescueScene {
       -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hits = this.raycaster.intersectObjects([this.fleet.group, this.helipads.group, this.terrain.group], true);
+    const hits = this.raycaster.intersectObjects([this.fleet.group, this.starfish.group, this.helipads.group, this.terrain.group], true);
     const id: unknown = hits[0]?.object.userData.helicopterId;
     const speechId: unknown = hits[0]?.object.userData.speechId;
     if (typeof id === 'string') {
       this.focusHelicopter(id);
     } else if (typeof speechId === 'string' && SCENE_SPEECH[speechId]) {
-      this.options.onSpeak(SCENE_SPEECH[speechId]);
+      this.options.onSpeak(SCENE_SPEECH[speechId], speechId === 'starfish' ? 'zh-CN' : 'en-US');
     }
   };
 
@@ -212,13 +216,18 @@ export class RescueScene {
       const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.selected.root.quaternion).normalize();
       const side = new THREE.Vector3().crossVectors(THREE.Object3D.DEFAULT_UP, forward).normalize();
       const isFireMission = this.selected.info.id === 'fire-01' || this.selected.info.id === 'rescue-03';
+      const onPad = this.selected.flight.onPad;
       const focusScale = Math.max(1, 0.9 / this.camera.aspect) * (isFireMission ? 1.35 : 1);
-      const targetDrop = isFireMission ? 1.05 : 0.4;
+      const targetDrop = onPad ? 0.12 : (isFireMission ? 1.05 : 0.4);
       const target = position.clone().add(new THREE.Vector3(0, -targetDrop * focusScale, 0));
-      const desired = target.clone()
-        .add(new THREE.Vector3(0, 2.1 * focusScale, 0))
-        .addScaledVector(side, 3.6 * focusScale)
-        .addScaledVector(forward, 2.4 * focusScale);
+      const desired = target.clone();
+      if (onPad) {
+        desired.add(new THREE.Vector3(3.6 * focusScale, 3.4 * focusScale, 4.8 * focusScale));
+      } else {
+        desired.add(new THREE.Vector3(0, 2.1 * focusScale, 0))
+          .addScaledVector(side, 3.6 * focusScale)
+          .addScaledVector(forward, 2.4 * focusScale);
+      }
       this.camera.up.set(0, 1, 0);
       this.camera.position.lerp(desired, smoothing);
       this.controls.target.lerp(target, smoothing * 1.25);
@@ -239,6 +248,8 @@ export class RescueScene {
       this.terrain.update(this.elapsed);
       this.fleet.update(this.elapsed, delta);
       this.helipads.update(this.elapsed, this.fleet.units);
+      const waterRescueUnit = this.fleet.units.find((unit) => unit.info.id === 'rescue-03');
+      if (waterRescueUnit) this.starfish.update(this.elapsed, waterRescueUnit);
     }
     this.controls.autoRotate = this.autoRotate && !this.paused && !this.selected && !this.resetting;
     this.updateFocus(delta);
